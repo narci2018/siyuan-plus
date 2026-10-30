@@ -27,5 +27,5 @@ if __name__ == "__main__":
 
     try:
         generate_msg_from_repo(args.repo, args)
-    except AssertionError:
-        print(args.tag)
+    except Exception:
+        print(args.tag or "")

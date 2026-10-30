@@ -25,6 +25,9 @@ def generate_msg_from_repo(repo_name, tag_name):
     repo = gh.get_repo(repo_name)
 
     milestone = U.find_milestone(repo, tag_name)
+    if not milestone:
+        print(f"Release {tag_name}")
+        return
     for issue in repo.get_issues(state="closed", milestone=milestone):  # type: ignore
         # REF https://pygithub.readthedocs.io/en/latest/github_objects/Issue.html#github.Issue.Issue
         desc_mapping[U.get_issue_first_label(issue, C.docmap_siyuan)].append(
@@ -42,5 +45,5 @@ if __name__ == "__main__":
 
     try:
         generate_msg_from_repo(args.repo, args.tag)
-    except AssertionError:
-        print(args.tag)
+    except Exception:
+        print(f"Release {args.tag}")
