@@ -401,6 +401,11 @@ jobs:
         if: fromJSON(inputs.config).goos == 'linux'
         run: sudo apt-get install -y rpm
 
+      - name: Setup Pandoc Binaries
+        shell: bash
+        run: python3 scripts/fetch-pandoc.py --goos "${{ fromJSON(inputs.config).goos }}" --goarch "${{ fromJSON(inputs.config).goarch }}" || python scripts/fetch-pandoc.py --goos "${{ fromJSON(inputs.config).goos }}" --goarch "${{ fromJSON(inputs.config).goarch }}"
+        working-directory: ${{ github.workspace }}/go/src/github.com/${{ github.repository }}
+
       - name: Building Electron App
         run: pnpm run ${{ fromJSON(inputs.config).electron_args }}
         working-directory: ${{ github.workspace }}/go/src/github.com/${{ github.repository }}/app

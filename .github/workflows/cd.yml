@@ -817,15 +817,29 @@ jobs:
 
       - name: Inject Signing Config
         run: |
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > ${{ github.workspace }}/siyuan-android/app/siyuan-android.jks
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > ${{ github.workspace }}/siyuan-android/app/siyuan-android.jks
+            STORE_PW="$ANDROID_KEYSTORE_PASSWORD"
+            KEY_ALIAS="$ANDROID_KEY_ALIAS"
+            KEY_PW="$ANDROID_KEY_PASSWORD"
+          else
+            echo "Generating self-signed keystore for Android build..."
+            keytool -genkeypair -v -keystore ${{ github.workspace }}/siyuan-android/app/siyuan-android.jks \
+              -alias siyuan -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass 123456 -keypass 123456 \
+              -dname "CN=SiYuan, OU=SiYuan, O=SiYuan, L=City, S=State, C=CN"
+            STORE_PW="123456"
+            KEY_ALIAS="siyuan"
+            KEY_PW="123456"
+          fi
           cat > ${{ github.workspace }}/siyuan-android/signings.gradle <<EOF
           android {
             signingConfigs {
               siyuanConfig {
                 storeFile file("siyuan-android.jks")
-                storePassword "$ANDROID_KEYSTORE_PASSWORD"
-                keyAlias "$ANDROID_KEY_ALIAS"
-                keyPassword "$ANDROID_KEY_PASSWORD"
+                storePassword "$STORE_PW"
+                keyAlias "$KEY_ALIAS"
+                keyPassword "$KEY_PW"
               }
             }
           }
