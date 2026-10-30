@@ -41,7 +41,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("-t", "--tag", help="the tag to filter issues.")
     parser.add_argument("repo", help="The repository name")
-    args = parser.parse_args()
+    args, _ = parser.parse_known_args()
 
     try:
         generate_msg_from_repo(args.repo, args.tag)

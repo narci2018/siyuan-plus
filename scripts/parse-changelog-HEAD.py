@@ -23,7 +23,7 @@ if __name__ == "__main__":
     parser.add_argument("-b", "--lastestRelease", help="lastest Release")
     parser.add_argument("-e", "--electronVersion", help="Electron Release")
     parser.add_argument("repo", help="The repository name")
-    args = parser.parse_args()
+    args, _ = parser.parse_known_args()
 
     try:
         generate_msg_from_repo(args.repo, args)
