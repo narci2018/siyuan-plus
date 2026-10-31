@@ -409,6 +409,8 @@ func getPetals() (ret []*Petal) {
 }
 
 func getPetals0() (ret []*Petal) {
+	initBuiltinPlugins()
+
 	ret = []*Petal{}
 	petalDir := filepath.Join(util.DataDir, "storage", "petal")
 	if err := os.MkdirAll(petalDir, 0755); err != nil {
@@ -418,6 +420,13 @@ func getPetals0() (ret []*Petal) {
 
 	confPath := filepath.Join(petalDir, "petals.json")
 	if !filelock.IsExist(confPath) {
+		targetPluginDir := filepath.Join(util.DataDir, "plugins", "siyuan-cloud-backup-pro")
+		if filelock.IsExist(filepath.Join(targetPluginDir, "plugin.json")) {
+			ret = append(ret, &Petal{
+				Name:    "siyuan-cloud-backup-pro",
+				Enabled: true,
+			})
+		}
 		data, err := gulu.JSON.MarshalIndentJSON(ret, "", "\t")
 		if err != nil {
 			logging.LogErrorf("marshal petals failed: %s", err)
@@ -439,6 +448,24 @@ func getPetals0() (ret []*Petal) {
 	if err = gulu.JSON.UnmarshalJSON(data, &ret); err != nil {
 		logging.LogErrorf("unmarshal petals failed: %s", err)
 		return
+	}
+
+	hasCloudBackup := false
+	for _, p := range ret {
+		if p.Name == "siyuan-cloud-backup-pro" {
+			hasCloudBackup = true
+			break
+		}
+	}
+	if !hasCloudBackup {
+		targetPluginDir := filepath.Join(util.DataDir, "plugins", "siyuan-cloud-backup-pro")
+		if filelock.IsExist(filepath.Join(targetPluginDir, "plugin.json")) {
+			ret = append(ret, &Petal{
+				Name:    "siyuan-cloud-backup-pro",
+				Enabled: true,
+			})
+			_ = savePetals0(ret)
+		}
 	}
 
 	var tmp []*Petal

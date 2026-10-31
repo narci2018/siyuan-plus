@@ -1,0 +1,12 @@
+{
+  "pluginTitle": "云端备份专家",
+  "backupNow": "立即全量备份",
+  "backupNotebook": "备份指定笔记本",
+  "cloudBrowser": "云端历史快照管理",
+  "settings": "备份与存储设置",
+  "backupSuccess": "备份成功并已安全上传至云端！",
+  "backupFailed": "备份失败：",
+  "testing": "正在测试连接...",
+  "testSuccess": "连接测试成功！",
+  "testFailed": "连接测试失败："
+}

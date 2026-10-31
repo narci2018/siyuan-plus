@@ -1,0 +1,12 @@
+{
+  "pluginTitle": "CloudSync Pro",
+  "backupNow": "Backup All Data Now",
+  "backupNotebook": "Backup Single Notebook",
+  "cloudBrowser": "Cloud Snapshot Browser",
+  "settings": "Storage & Backup Settings",
+  "backupSuccess": "Backup completed and securely uploaded!",
+  "backupFailed": "Backup failed: ",
+  "testing": "Testing connection...",
+  "testSuccess": "Connection successful!",
+  "testFailed": "Connection failed: "
+}

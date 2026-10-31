@@ -36,6 +36,9 @@ linux:
     }
   }
   extraResources:
+  - from: "plugins"
+    to: "plugins"
+    filter: "!**/{.DS_Store}"
     - from: "kernel-linux"
       to: "kernel"
   target:

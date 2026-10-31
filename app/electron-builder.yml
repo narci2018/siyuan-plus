@@ -22,6 +22,9 @@ extraFiles:
 win:
   icon: "src/assets/icon.ico"
   extraResources:
+  - from: "plugins"
+    to: "plugins"
+    filter: "!**/{.DS_Store}"
     - from: "kernel"
       to: "kernel"
   requestedExecutionLevel: "asInvoker"
