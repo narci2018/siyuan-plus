@@ -68,19 +68,10 @@ jobs:
 
       - name: Verify siyuan-android version
         id: android_version
-        # Android 的 siyuanVersionName 必须与 package.json 版本一致，否则在打包前终止整个流程。
         run: |
           ANDROID_VERSION=$(sed -nE 's/^[[:space:]]*siyuanVersionName[[:space:]]*=[[:space:]]*"([^"]+)"[[:space:]]*$/\1/p' build.gradle)
           VERSION="${{ steps.version.outputs.value }}"
-          if [ -z "$ANDROID_VERSION" ]; then
-            echo "Unable to read siyuanVersionName from siyuan-android/build.gradle, stopping"
-            exit 1
-          fi
-          if [ "$ANDROID_VERSION" != "$VERSION" ]; then
-            echo "siyuan-android version ($ANDROID_VERSION) does not match package.json version ($VERSION), stopping"
-            exit 1
-          fi
-          echo "siyuan-android version matches: $ANDROID_VERSION"
+          echo "siyuan-android upstream version: $ANDROID_VERSION, target version: $VERSION"
           echo "ref=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
         working-directory: ${{ github.workspace }}/siyuan-android
 
@@ -798,7 +789,9 @@ jobs:
         # 更稳;sed 删除所有 maven.aliyun.com 行,保留官方仓库。
         run: |
           sed -i '/maven.aliyun.com/d' build.gradle
-          echo "=== Patched build.gradle repositories ==="
+          sed -i -E 's/(siyuanVersionName[[:space:]]*=[[:space:]]*")[^"]+(")/\1${{ needs.prepare.outputs.version }}\2/' build.gradle
+          echo "=== Patched build.gradle ==="
+          grep "siyuanVersionName" build.gradle || true
           grep -A 6 "repositories" build.gradle | head -20
         working-directory: ${{ github.workspace }}/siyuan-android
 
