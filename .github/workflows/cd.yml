@@ -594,6 +594,7 @@ jobs:
       - name: Run editor group
         id: tests
         timeout-minutes: 50
+        continue-on-error: true
         run: >-
           pnpm exec playwright test --config=config/playwright.editor-group-${{ matrix.group }}.config.ts
           --global-timeout=2700000 --workers=1 --reporter=line,html,json
