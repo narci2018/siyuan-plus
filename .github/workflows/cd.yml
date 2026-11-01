@@ -984,7 +984,7 @@ jobs:
               fi
             done
             if [ "${READY}" = true ]; then
-              gh release edit "${TAG}" --draft=false --prerelease
+              gh release edit "${TAG}" --draft=false --prerelease=false --latest
               exit 0
             fi
             sleep 5
