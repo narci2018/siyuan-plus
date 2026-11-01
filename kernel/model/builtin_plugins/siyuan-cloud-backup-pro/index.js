@@ -1,12 +1,22 @@
 const { Plugin, Setting, Dialog, showMessage, confirmDialog } = require("siyuan");
 
+function normalizeEndpoint(ep) {
+  if (!ep) return "";
+  let clean = ep.trim().replace(/\/+$/, "");
+  if (!clean) return "";
+  if (!clean.startsWith("http://") && !clean.startsWith("https://")) {
+    clean = "https://" + clean;
+  }
+  return clean;
+}
+
 // ==========================================
 // 1. Web Crypto AWS SigV4 Signer & S3 Engine
 // ==========================================
 class AwsSigV4Signer {
   constructor(credentials) {
-    this.accessKey = credentials.accessKey;
-    this.secretKey = credentials.secretKey;
+    this.accessKey = credentials.accessKey || "";
+    this.secretKey = credentials.secretKey || "";
     this.region = credentials.region || "us-east-1";
     this.service = "s3";
   }
@@ -101,11 +111,11 @@ class AwsSigV4Signer {
 
 class S3Engine {
   constructor(config) {
-    this.endpoint = (config.endpoint || "").replace(/\/+$/, "");
-    this.region = config.region || "auto";
-    this.bucket = config.bucket;
-    this.accessKey = config.accessKey;
-    this.secretKey = config.secretKey;
+    this.endpoint = normalizeEndpoint(config.endpoint);
+    this.region = (config.region || "auto").trim();
+    this.bucket = (config.bucket || "").trim();
+    this.accessKey = (config.accessKey || "").trim();
+    this.secretKey = (config.secretKey || "").trim();
     this.pathStyle = config.pathStyle !== false;
     this.prefix = (config.prefix || "siyuan-backups/").replace(/^\/+/, "");
     this.signer = new AwsSigV4Signer({
@@ -115,7 +125,12 @@ class S3Engine {
     });
   }
 
+  isConfigured() {
+    return !!(this.endpoint && this.bucket && this.accessKey && this.secretKey);
+  }
+
   getObjectUrl(key) {
+    if (!this.endpoint) throw new Error("S3 Endpoint 尚未配置！");
     if (this.pathStyle) {
       return `${this.endpoint}/${this.bucket}/${encodeURIComponent(key).replace(/%2F/g, "/")}`;
     }
@@ -138,7 +153,7 @@ class S3Engine {
       });
       const res = await fetch(url, { method: "GET", headers });
       if (res.status === 200 || res.status === 204) {
-        return { ok: true, msg: "S3 连通性测试成功！权限认证正常。" };
+        return { ok: true, msg: "S3 连通性测试成功！服务与权限验证通过。" };
       }
       const text = await res.text();
       return { ok: false, msg: `S3 响应错误 (${res.status}): ${text.substring(0, 200)}` };
@@ -148,6 +163,9 @@ class S3Engine {
   }
 
   async upload(key, data, contentType = "application/zip") {
+    if (!this.isConfigured()) {
+      throw new Error("S3 存储配置不完整，请先在「存储提供商」中填写 Endpoint、Bucket、AK、SK 并保存！");
+    }
     const fullKey = `${this.prefix}${key}`;
     const url = this.getObjectUrl(fullKey);
     const headers = { "content-type": contentType };
@@ -170,6 +188,9 @@ class S3Engine {
   }
 
   async listBackups() {
+    if (!this.endpoint || !this.bucket) {
+      return [];
+    }
     const url = this.pathStyle
       ? `${this.endpoint}/${this.bucket}?prefix=${encodeURIComponent(this.prefix)}`
       : `${new URL(this.endpoint).protocol}//${this.bucket}.${new URL(this.endpoint).host}?prefix=${encodeURIComponent(this.prefix)}`;
@@ -244,10 +265,14 @@ class S3Engine {
 // ==========================================
 class WebDAVEngine {
   constructor(config) {
-    this.endpoint = (config.endpoint || "").replace(/\/+$/, "");
-    this.username = config.username || "";
-    this.password = config.password || "";
+    this.endpoint = normalizeEndpoint(config.endpoint);
+    this.username = (config.username || "").trim();
+    this.password = (config.password || "").trim();
     this.prefix = (config.prefix || "siyuan-backups/").replace(/^\/+|\/+$/g, "");
+  }
+
+  isConfigured() {
+    return !!(this.endpoint && this.username && this.password);
   }
 
   getAuthHeader() {
@@ -256,6 +281,7 @@ class WebDAVEngine {
   }
 
   async ensureDirectory(dirPath) {
+    if (!this.endpoint) return;
     const parts = dirPath.split("/").filter(Boolean);
     let current = this.endpoint;
     for (const part of parts) {
@@ -293,6 +319,9 @@ class WebDAVEngine {
   }
 
   async upload(key, data, contentType = "application/zip") {
+    if (!this.isConfigured()) {
+      throw new Error("WebDAV 配置不完整，请先在「存储提供商」中填写地址、账号、密码并保存！");
+    }
     if (this.prefix) {
       await this.ensureDirectory(this.prefix);
     }
@@ -313,6 +342,9 @@ class WebDAVEngine {
   }
 
   async listBackups() {
+    if (!this.endpoint) {
+      return [];
+    }
     const folderUrl = this.prefix
       ? `${this.endpoint}/${this.prefix.split("/").map(encodeURIComponent).join("/")}/`
       : `${this.endpoint}/`;
@@ -361,6 +393,7 @@ class WebDAVEngine {
   }
 
   async download(key) {
+    if (!this.endpoint) throw new Error("WebDAV 地址未配置");
     const url = `${this.endpoint}/${key.split("/").map(encodeURIComponent).join("/")}`;
     const res = await fetch(url, {
       method: "GET",
@@ -371,6 +404,7 @@ class WebDAVEngine {
   }
 
   async delete(key) {
+    if (!this.endpoint) throw new Error("WebDAV 地址未配置");
     const url = `${this.endpoint}/${key.split("/").map(encodeURIComponent).join("/")}`;
     const res = await fetch(url, {
       method: "DELETE",
@@ -525,6 +559,14 @@ class CloudBackupPlugin extends Plugin {
     return new S3Engine(this.configData.s3);
   }
 
+  isCurrentProviderConfigured() {
+    const isS3 = this.configData.provider === "s3";
+    if (isS3) {
+      return !!(this.configData.s3.endpoint && this.configData.s3.bucket && this.configData.s3.accessKey && this.configData.s3.secretKey);
+    }
+    return !!(this.configData.webdav.endpoint && this.configData.webdav.username && this.configData.webdav.password);
+  }
+
   async saveConfig() {
     await this.saveData(this.storageKey, this.configData);
     this.initSchedule();
@@ -542,7 +584,7 @@ class CloudBackupPlugin extends Plugin {
   initSchedule() {
     if (this.timer) clearInterval(this.timer);
     const intervalMin = parseInt(this.configData.autoBackupInterval, 10);
-    if (intervalMin > 0) {
+    if (intervalMin > 0 && this.isCurrentProviderConfigured()) {
       console.log(`[CloudBackupPro] 已启用定时自动备份，周期: ${intervalMin} 分钟`);
       this.timer = setInterval(() => {
         this.performBackup({ silent: true, mode: "full" });
@@ -551,10 +593,7 @@ class CloudBackupPlugin extends Plugin {
   }
 
   openQuickMenu() {
-    const isConfigured =
-      this.configData.provider === "s3"
-        ? !!(this.configData.s3.endpoint && this.configData.s3.bucket)
-        : !!this.configData.webdav.endpoint;
+    const isConfigured = this.isCurrentProviderConfigured();
 
     const lastTime = this.configData.lastBackupTime
       ? new Date(this.configData.lastBackupTime).toLocaleString()
@@ -615,6 +654,14 @@ class CloudBackupPlugin extends Plugin {
   }
 
   async performBackup({ mode = "full", notebookId = "", notebookName = "", silent = false }) {
+    if (!this.isCurrentProviderConfigured()) {
+      if (!silent) {
+        showMessage("请先进入「设置」->「存储提供商」填写并保存完整的 S3 或 WebDAV 配置！", 5000, "warning");
+        this.openSettingsDialog();
+      }
+      return;
+    }
+
     if (!silent) showMessage("正在生成数据快照并打包，请稍候...", 3000, "info");
     const t0 = Date.now();
 
@@ -856,12 +903,42 @@ class CloudBackupPlugin extends Plugin {
   }
 
   async renderSnapshotList(container) {
-    container.innerHTML = '<div style="text-align:center; padding:30px; color:var(--b3-theme-on-surface-light);">正在拉取云端快照列表...</div>';
+    const isConfigured = this.isCurrentProviderConfigured();
+    const currentProviderName = this.configData.provider === "s3" ? "S3 协议" : "WebDAV 协议";
+
+    if (!isConfigured) {
+      container.innerHTML = `
+        <div style="text-align:center; padding:36px 16px; color:var(--b3-theme-on-surface-light);">
+          <div style="font-size:26px; margin-bottom:8px;">🔌</div>
+          <div style="font-weight:600; font-size:14px; margin-bottom:6px; color:var(--b3-theme-on-surface);">
+            尚未配置完整的【${currentProviderName}】连接参数
+          </div>
+          <div style="font-size:12px; margin-bottom:14px; max-width:420px; margin-left:auto; margin-right:auto; line-height:1.6;">
+            请先切换到左侧<b>「存储提供商」</b>标签页，填写 Endpoint、存储桶/账号与密码，点击「测试连接」成功并保存后，即可正常管理快照与逆向恢复数据。
+          </div>
+          <button class="b3-button b3-button--outline" id="csp-btn-go-storage" style="font-weight:500;">
+            👉 前往配置存储提供商
+          </button>
+        </div>
+      `;
+      const btnGo = container.querySelector("#csp-btn-go-storage");
+      if (btnGo) {
+        btnGo.onclick = () => {
+          const dialogEl = container.closest(".csp-modal");
+          if (dialogEl) {
+            dialogEl.querySelector('.csp-tab-btn[data-tab="tab-storage"]')?.click();
+          }
+        };
+      }
+      return;
+    }
+
+    container.innerHTML = '<div style="text-align:center; padding:30px; color:var(--b3-theme-on-surface-light);">正在连接云端并拉取快照列表...</div>';
     try {
       const engine = this.getEngine();
       const items = await engine.listBackups();
       if (items.length === 0) {
-        container.innerHTML = '<div style="text-align:center; padding:40px; color:var(--b3-theme-on-surface-light);">云端暂无快照文件</div>';
+        container.innerHTML = '<div style="text-align:center; padding:40px; color:var(--b3-theme-on-surface-light);">云端目前暂无备份快照。您可以点击上方按钮执行首次手动备份！</div>';
         return;
       }
 
@@ -1028,11 +1105,11 @@ class CloudBackupPlugin extends Plugin {
               <div style="display:flex; gap:12px;">
                 <div class="csp-form-group" style="flex:1;">
                   <label>Bucket (存储桶名)</label>
-                  <input class="b3-text-field csp-input" id="s3-bucket" value="${cfg.s3.bucket || ""}" />
+                  <input class="b3-text-field csp-input" id="s3-bucket" value="${cfg.s3.bucket || ""}" placeholder="存储桶名称" />
                 </div>
                 <div class="csp-form-group" style="flex:1;">
                   <label>Region (区域)</label>
-                  <input class="b3-text-field csp-input" id="s3-region" value="${cfg.s3.region || "auto"}" />
+                  <input class="b3-text-field csp-input" id="s3-region" value="${cfg.s3.region || "auto"}" placeholder="如 auto 或 us-east-1" />
                 </div>
               </div>
               <div style="display:flex; gap:12px;">
@@ -1307,17 +1384,17 @@ class CloudBackupPlugin extends Plugin {
   syncFormToConfig(el) {
     const providerSelect = el.querySelector("#cfg-provider");
     this.configData.provider = providerSelect.value;
-    this.configData.s3.endpoint = el.querySelector("#s3-endpoint").value.trim();
+    this.configData.s3.endpoint = normalizeEndpoint(el.querySelector("#s3-endpoint").value);
     this.configData.s3.bucket = el.querySelector("#s3-bucket").value.trim();
-    this.configData.s3.region = el.querySelector("#s3-region").value.trim();
+    this.configData.s3.region = el.querySelector("#s3-region").value.trim() || "auto";
     this.configData.s3.accessKey = el.querySelector("#s3-access").value.trim();
     this.configData.s3.secretKey = el.querySelector("#s3-secret").value.trim();
-    this.configData.s3.prefix = el.querySelector("#s3-prefix").value.trim();
+    this.configData.s3.prefix = el.querySelector("#s3-prefix").value.trim() || "siyuan-backups/";
 
-    this.configData.webdav.endpoint = el.querySelector("#dav-endpoint").value.trim();
+    this.configData.webdav.endpoint = normalizeEndpoint(el.querySelector("#dav-endpoint").value);
     this.configData.webdav.username = el.querySelector("#dav-username").value.trim();
     this.configData.webdav.password = el.querySelector("#dav-password").value.trim();
-    this.configData.webdav.prefix = el.querySelector("#dav-prefix").value.trim();
+    this.configData.webdav.prefix = el.querySelector("#dav-prefix").value.trim() || "siyuan-backups/";
 
     this.configData.autoBackupInterval = parseInt(el.querySelector("#cfg-auto-interval").value, 10);
     this.configData.retentionCount = parseInt(el.querySelector("#cfg-retention").value, 10) || 15;
