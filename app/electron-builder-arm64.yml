@@ -22,9 +22,6 @@ extraFiles:
 win:
   icon: "src/assets/icon.ico"
   extraResources:
-  - from: "plugins"
-    to: "plugins"
-    filter: "!**/{.DS_Store}"
     - from: "kernel-arm64"
       to: "kernel"
   requestedExecutionLevel: "asInvoker"
@@ -51,6 +48,9 @@ nsis:
   uninstallerSidebar: "nsis/uninstallerSidebar.bmp"
 
 extraResources:
+  - from: "plugins"
+    to: "plugins"
+    filter: "!**/{.DS_Store}"
   - from: "changelogs"
     to: "changelogs"
   - from: "stage"

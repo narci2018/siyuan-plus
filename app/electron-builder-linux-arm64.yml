@@ -35,9 +35,6 @@ linux:
     }
   }
   extraResources:
-  - from: "plugins"
-    to: "plugins"
-    filter: "!**/{.DS_Store}"
     - from: "kernel-linux-arm64"
       to: "kernel"
   target:
@@ -63,6 +60,9 @@ rpm:
     - "_build_id_links none"
 
 extraResources:
+  - from: "plugins"
+    to: "plugins"
+    filter: "!**/{.DS_Store}"
   - from: "changelogs"
     to: "changelogs"
   - from: "stage"

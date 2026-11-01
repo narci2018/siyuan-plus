@@ -35,9 +35,6 @@ mac:
       schemes:
         - "siyuan"
   extraResources:
-  - from: "plugins"
-    to: "plugins"
-    filter: "!**/{.DS_Store}"
     - from: "kernel-darwin"
       to: "kernel"
   target:
@@ -45,6 +42,9 @@ mac:
       arch: "x64"
 
 extraResources:
+  - from: "plugins"
+    to: "plugins"
+    filter: "!**/{.DS_Store}"
   - from: "changelogs"
     to: "changelogs"
   - from: "stage"
